@@ -205,15 +205,30 @@ baucis.Controller.decorators(function (model, protect) {
                 allowedFields = allowedFields.split(/\s+/);
             }
 
+            var fieldsRules = allowedFields.reduce(function (res, field) {
+                res[field && field[0] === '-' ? notAllowed : allowed].push(field);
+                return res;
+            } , { allowed: [], notAllowed: [] });
+
+            var allButThese = fieldsRules.notAllowed.length > 0;
+
             Object.keys(newDoc).forEach(function(attr) {
-                if (allowedFields.indexOf(attr) === -1) {
-                    if (controller.access().writeException) {
-                        res.status(403).send(baucis.Error.Forbidden('Attempt to update read-only field.'));
-                        error = true;
-                        return;
+                var found = false;
+
+                if (allButThese) {
+                    if (fieldsRules.notAllowed.indexOf(attr) === -1) {
+                        found = true;
                     }
-                    delete newDoc[attr];
+                } else if (fieldsRules.allowed.indexOf(attr) !== -1) {
+                    found = true;
                 }
+
+                if (! found && controller.access().writeException) {
+                    res.status(403).send(baucis.Error.Forbidden('Attempt to update read-only field.'));
+                    error = true;
+                    return;
+                }
+                delete newDoc[attr];
             });
 
             cb(null, ctx);
